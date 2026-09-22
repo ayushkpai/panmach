@@ -57,7 +57,7 @@ function makeOrder(): Order {
   };
 }
 
-type Phase = "mix" | "cook" | "serve";
+type Phase = "mix" | "cook" | "serve" | "delivery";
 type Screen = "start" | "play" | "over";
 type CookRating = "golden" | "crisp" | null;
 
@@ -88,6 +88,34 @@ function toppingColor(id: ToppingId) {
   }
 }
 
+const WARM_MAX = 100;
+const WARM_DRAIN = WARM_MAX / 16;
+const DELIVERY_BLOCKS = 6;
+const PEDAL_BASE = 0.55;
+const PEDAL_STEP = 0.05;
+const PEDAL_MAX = 1.2;
+const STREETS = [
+  "Batter Ave",
+  "Syrup St",
+  "Maple Blvd",
+  "Waffle Way",
+  "Honey Dr",
+  "Griddle Ct",
+];
+
+function randomAddress() {
+  const street = STREETS[Math.floor(Math.random() * STREETS.length)];
+  const num = Math.floor(Math.random() * 900) + 10;
+  return `${num} ${street}`;
+}
+
+function tipFor(warmth: number): { tip: number; note: string } {
+  if (warmth >= 70) return { tip: 14, note: "Piping hot delivery!" };
+  if (warmth >= 45) return { tip: 8, note: "Warm and happy customer!" };
+  if (warmth >= 20) return { tip: 3, note: "A bit lukewarm..." };
+  return { tip: 1, note: "Cold waffle, tiny tip." };
+}
+
 export default function WaffleGame() {
   const [screen, setScreen] = useState<Screen>("start");
   const [phase, setPhase] = useState<Phase>("mix");
@@ -108,7 +136,15 @@ export default function WaffleGame() {
   const [toast, setToast] = useState<string | null>(null);
   const [shakeId, setShakeId] = useState<IngredientId | null>(null);
   const [rating, setRating] = useState<CookRating>(null);
+  const [warmth, setWarmth] = useState(WARM_MAX);
+  const [blocksLeft, setBlocksLeft] = useState(DELIVERY_BLOCKS);
+  const [cooldown, setCooldown] = useState(0);
+  const [street, setStreet] = useState(() => randomAddress());
   const clickLock = useRef(false);
+  const warmthRef = useRef(WARM_MAX);
+  const blocksRef = useRef(DELIVERY_BLOCKS);
+  const cooldownRef = useRef(0);
+  const pedalCountRef = useRef(0);
 
   const showToast = (msg: string) => {
     setToast(null);
@@ -239,6 +275,25 @@ export default function WaffleGame() {
     setToppings((t) => [...t, id]);
   };
 
+  const startNextOrder = () => {
+    setOrder(makeOrder());
+    setPantry(shuffle(INGREDIENTS.map((i) => i.id)));
+    setPhase("mix");
+    setStep(0);
+    setMistakes(0);
+    setToppings([]);
+    setRating(null);
+    setCookSpeed(0.11 + Math.random() * 0.07);
+    warmthRef.current = WARM_MAX;
+    setWarmth(WARM_MAX);
+    blocksRef.current = DELIVERY_BLOCKS;
+    setBlocksLeft(DELIVERY_BLOCKS);
+    cooldownRef.current = 0;
+    setCooldown(0);
+    pedalCountRef.current = 0;
+    setStreet(randomAddress());
+  };
+
   const serve = () => {
     if (phase !== "serve" || clickLock.current) return;
     const hasRequired = order.required.every((r) => toppings.includes(r));
@@ -249,21 +304,93 @@ export default function WaffleGame() {
     const optional = toppings.filter((t) => !order.required.includes(t)).length;
     const pay = 6 + 3 * order.required.length + 2 * optional;
     setScore((s) => s + pay);
-    setServed((s) => s + 1);
-    showToast(`Delivered! +$${pay}`);
+    showToast(`Rung up! +$${pay} — now deliver it hot.`);
     clickLock.current = true;
     setTimeout(() => {
       clickLock.current = false;
-      setOrder(makeOrder());
-      setPantry(shuffle(INGREDIENTS.map((i) => i.id)));
-      setPhase("mix");
-      setStep(0);
-      setMistakes(0);
-      setToppings([]);
-      setRating(null);
-      setCookSpeed(0.11 + Math.random() * 0.07);
+      warmthRef.current = WARM_MAX;
+      setWarmth(WARM_MAX);
+      blocksRef.current = DELIVERY_BLOCKS;
+      setBlocksLeft(DELIVERY_BLOCKS);
+      cooldownRef.current = 0;
+      setCooldown(0);
+      pedalCountRef.current = 0;
+      setStreet(randomAddress());
+      setPhase("delivery");
     }, 1100);
   };
+
+  const pedal = () => {
+    if (phase !== "delivery" || clickLock.current) return;
+    if (blocksRef.current <= 0 || warmthRef.current <= 0) return;
+    if (cooldownRef.current > 0) return;
+    const left = blocksRef.current - 1;
+    blocksRef.current = left;
+    setBlocksLeft(left);
+    const cd = Math.min(
+      PEDAL_BASE + pedalCountRef.current * PEDAL_STEP,
+      PEDAL_MAX
+    );
+    pedalCountRef.current += 1;
+    cooldownRef.current = cd;
+    setCooldown(cd);
+    if (left <= 0) {
+      arrive(warmthRef.current);
+    }
+  };
+
+  const arrive = (w: number) => {
+    const { tip, note } = tipFor(w);
+    clickLock.current = true;
+    setScore((s) => s + tip);
+    setServed((s) => s + 1);
+    showToast(`${note} +$${tip} tip`);
+    setTimeout(() => {
+      clickLock.current = false;
+      startNextOrder();
+    }, 1300);
+  };
+
+  const failDelivery = () => {
+    if (clickLock.current) return;
+    clickLock.current = true;
+    warmthRef.current = 0;
+    setWarmth(0);
+    const left = hearts - 1;
+    setHearts(left);
+    showToast("The waffle went cold in the bag. -1 heart");
+    setTimeout(() => {
+      clickLock.current = false;
+      if (left <= 0) {
+        setScreen("over");
+        return;
+      }
+      startNextOrder();
+    }, 1100);
+  };
+
+  useEffect(() => {
+    if (phase !== "delivery") return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      if (blocksRef.current <= 0) return; // arrived, just waiting to move on
+      warmthRef.current = Math.max(warmthRef.current - dt * WARM_DRAIN, 0);
+      setWarmth(warmthRef.current);
+      cooldownRef.current = Math.max(cooldownRef.current - dt, 0);
+      setCooldown(cooldownRef.current);
+      if (warmthRef.current <= 0) {
+        failDelivery();
+        return;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -271,11 +398,12 @@ export default function WaffleGame() {
       e.preventDefault();
       if (phase === "cook") toggleIron();
       else if (phase === "serve") serve();
+      else if (phase === "delivery") pedal();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, phase, cooking, cook, toppings, order, hearts]);
+  }, [screen, phase, cooking, cook, toppings, order, hearts, cooldown]);
 
   const startOver = () => {
     setScreen("play");
@@ -292,6 +420,14 @@ export default function WaffleGame() {
     setDoneness(0);
     setToppings([]);
     setRating(null);
+    warmthRef.current = WARM_MAX;
+    setWarmth(WARM_MAX);
+    blocksRef.current = DELIVERY_BLOCKS;
+    setBlocksLeft(DELIVERY_BLOCKS);
+    cooldownRef.current = 0;
+    setCooldown(0);
+    pedalCountRef.current = 0;
+    setStreet(randomAddress());
   };
 
   if (screen === "start") {
@@ -308,6 +444,7 @@ export default function WaffleGame() {
           <li>1. Add the 3 recipe ingredients in order.</li>
           <li>2. Close the iron and open it in the GOLDEN zone.</li>
           <li>3. Add every topping on the ticket, then serve.</li>
+          <li>4. Pedal to the address before the waffle cools.</li>
         </ol>
         <button
           onClick={startOver}
@@ -385,6 +522,9 @@ export default function WaffleGame() {
         )}
         {phase === "serve" && (
           <span>Add what the customer ordered, garnish how you like, then serve.</span>
+        )}
+        {phase === "delivery" && (
+          <span>Pedal to {street} fast — the warm meter is draining!</span>
         )}
       </div>
 
@@ -484,6 +624,16 @@ export default function WaffleGame() {
               toppings={toppings}
               addTopping={addTopping}
               serve={serve}
+            />
+          )}
+
+          {phase === "delivery" && (
+            <DeliveryPanel
+              street={street}
+              warmth={warmth}
+              blocksLeft={blocksLeft}
+              cooldown={cooldown}
+              pedal={pedal}
             />
           )}
         </section>
@@ -635,6 +785,126 @@ function ServePanel({
       >
         Serve & Ring Up
       </button>
+    </div>
+  );
+}
+
+function BikeScene({ progress }: { progress: number }) {
+  return (
+    <div className="relative h-32 overflow-hidden rounded-2xl bg-emerald-950">
+      <div className="absolute left-2 top-2 rounded bg-emerald-800/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100">
+        route
+      </div>
+      <div className="absolute bottom-0 inset-x-0 h-7 bg-zinc-800">
+        <div className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 border-t-2 border-dashed border-yellow-400/60" />
+      </div>
+      <div
+        className="absolute bottom-2 transition-all duration-150 ease-linear"
+        style={{ left: `calc(${progress * 78}% + 6px)` }}
+      >
+        <svg viewBox="0 0 62 40" className="h-12 w-[74px]" aria-hidden="true">
+          <circle cx={15} cy={30} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
+          <circle cx={15} cy={30} r={2.5} fill="#a8a29e" />
+          <circle cx={46} cy={30} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
+          <circle cx={46} cy={30} r={2.5} fill="#a8a29e" />
+          <path
+            d="M15 30 L46 30 M15 30 L26 12 H34 M34 12 L46 30"
+            stroke="#f59e0b"
+            strokeWidth={3}
+            fill="none"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M20 12 Q26 8 33 9"
+            stroke="#f59e0b"
+            strokeWidth={3}
+            fill="none"
+          />
+          <path d="M24 29 L42 25" stroke="#a8a29e" strokeWidth={2.5} />
+          <rect x={18} y={22} width={10} height={6} rx={1.5} fill="#e11d48" />
+        </svg>
+      </div>
+      <div className="absolute bottom-2 right-2">
+        <svg viewBox="0 0 66 56" className="h-12 w-14" aria-hidden="true">
+          <polygon points="33,2 2,24 64,24" fill="#b45309" />
+          <rect x={8} y={24} width={50} height={28} rx={2} fill="#fcd34d" />
+          <rect x={4} y={30} width={4} height={4} fill="#b45309" />
+          <rect x={58} y={30} width={4} height={4} fill="#b45309" />
+          <rect x={28} y={34} width={12} height={18} fill="#7c2d12" />
+          <rect x={10} y={28} width={5} height={5} fill="#f99b3b" />
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function DeliveryPanel({
+  street,
+  warmth,
+  blocksLeft,
+  cooldown,
+  pedal,
+}: {
+  street: string;
+  warmth: number;
+  blocksLeft: number;
+  cooldown: number;
+  pedal: () => void;
+}) {
+  const progress = 1 - blocksLeft / DELIVERY_BLOCKS;
+  const warmthPct = Math.round(warmth);
+  const canPedal = cooldown <= 0;
+  const warmColor =
+    warmthPct >= 70 ? "bg-emerald-500" : warmthPct >= 45 ? "bg-amber-400" : "bg-red-500";
+  return (
+    <div className="flex flex-1 flex-col justify-center gap-4">
+      <div className="rounded-2xl bg-white p-4 shadow-sm">
+        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700/70">
+          Delivery address
+        </div>
+        <div className="font-bold text-amber-950">{street}</div>
+        <div className="mt-2 text-sm font-semibold text-amber-900">
+          {blocksLeft > 0
+            ? `${blocksLeft} block${blocksLeft > 1 ? "s" : ""} to go`
+            : "Arriving!"}
+        </div>
+      </div>
+      <div className="rounded-2xl bg-amber-50 p-4 shadow-sm">
+        <div className="mb-2 flex justify-between text-xs font-semibold text-amber-700/70">
+          <span>Warmth</span>
+          <span>{warmthPct}%</span>
+        </div>
+        <div className="h-5 w-full overflow-hidden rounded-full bg-zinc-200">
+          <div
+            className={`h-full rounded-full transition-all duration-150 ${warmColor}`}
+            style={{ width: `${warmthPct}%` }}
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] font-bold uppercase tracking-wide">
+          <span className="rounded bg-emerald-500/20 px-1 py-0.5 text-emerald-700">
+            70+ = $14
+          </span>
+          <span className="rounded bg-amber-400/30 px-1 py-0.5 text-amber-700">
+            45+ = $8
+          </span>
+          <span className="rounded bg-red-500/20 px-1 py-0.5 text-red-700">
+            20+ = $3
+          </span>
+        </div>
+      </div>
+      <BikeScene progress={progress} />
+      <button
+        onClick={pedal}
+        disabled={!canPedal}
+        className="rounded-full bg-amber-700 px-8 py-3 text-lg font-bold text-amber-50 shadow-lg transition hover:bg-amber-800 active:scale-95 disabled:opacity-50"
+      >
+        {canPedal ? "Pedal! (space)" : "pedaling..."}
+      </button>
+      {!canPedal && (
+        <p className="-mt-2 text-center text-xs text-amber-800/60">
+          catching your breath...
+        </p>
+      )}
     </div>
   );
 }
