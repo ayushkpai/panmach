@@ -100,7 +100,7 @@ export default function WaffleGame() {
   const [hearts, setHearts] = useState(3);
   const [cooking, setCooking] = useState(false);
   const [cook, setCook] = useState(0);
-  const [cookSpeed, setCookSpeed] = useState(2.0);
+  const [cookSpeed, setCookSpeed] = useState(0.13);
   const [doneness, setDoneness] = useState(0);
   const [toppings, setToppings] = useState<ToppingId[]>([]);
   const [score, setScore] = useState(0);
@@ -261,7 +261,7 @@ export default function WaffleGame() {
       setMistakes(0);
       setToppings([]);
       setRating(null);
-      setCookSpeed(1.6 + Math.random() * 1.1);
+      setCookSpeed(0.11 + Math.random() * 0.07);
     }, 1100);
   };
 
@@ -286,7 +286,7 @@ export default function WaffleGame() {
     setStep(0);
     setMistakes(0);
     setPhase("mix");
-    setCookSpeed(2.0);
+    setCookSpeed(0.13);
     setCooking(false);
     setCook(0);
     setDoneness(0);
