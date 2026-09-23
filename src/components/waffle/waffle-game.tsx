@@ -140,7 +140,9 @@ export default function WaffleGame() {
   const [blocksLeft, setBlocksLeft] = useState(DELIVERY_BLOCKS);
   const [cooldown, setCooldown] = useState(0);
   const [street, setStreet] = useState(() => randomAddress());
+  const [road, setRoad] = useState(0);
   const clickLock = useRef(false);
+  const roadRef = useRef(0);
   const warmthRef = useRef(WARM_MAX);
   const blocksRef = useRef(DELIVERY_BLOCKS);
   const cooldownRef = useRef(0);
@@ -290,6 +292,8 @@ export default function WaffleGame() {
     setBlocksLeft(DELIVERY_BLOCKS);
     cooldownRef.current = 0;
     setCooldown(0);
+    roadRef.current = 0;
+    setRoad(0);
     pedalCountRef.current = 0;
     setStreet(randomAddress());
   };
@@ -314,6 +318,8 @@ export default function WaffleGame() {
       setBlocksLeft(DELIVERY_BLOCKS);
       cooldownRef.current = 0;
       setCooldown(0);
+      roadRef.current = 0;
+      setRoad(0);
       pedalCountRef.current = 0;
       setStreet(randomAddress());
       setPhase("delivery");
@@ -377,6 +383,8 @@ export default function WaffleGame() {
       const dt = (now - last) / 1000;
       last = now;
       if (blocksRef.current <= 0) return; // arrived, just waiting to move on
+      roadRef.current += dt * (cooldownRef.current > 0 ? 1 : 0.3);
+      setRoad(roadRef.current);
       warmthRef.current = Math.max(warmthRef.current - dt * WARM_DRAIN, 0);
       setWarmth(warmthRef.current);
       cooldownRef.current = Math.max(cooldownRef.current - dt, 0);
@@ -426,6 +434,8 @@ export default function WaffleGame() {
     setBlocksLeft(DELIVERY_BLOCKS);
     cooldownRef.current = 0;
     setCooldown(0);
+    roadRef.current = 0;
+    setRoad(0);
     pedalCountRef.current = 0;
     setStreet(randomAddress());
   };
@@ -722,6 +732,7 @@ export default function WaffleGame() {
 
             {phase === "delivery" && (
               <DeliveryPanel
+                road={road}
                 street={street}
                 warmth={warmth}
                 blocksLeft={blocksLeft}
@@ -945,84 +956,136 @@ function ServePanel({
   );
 }
 
-function BikeScene({ progress }: { progress: number }) {
-  const arrived = progress >= 1;
+const ROAD_TILE = 200;
+const ROAD_TILES = 8;
+const CROSS_STREETS = [
+  "Maple St",
+  "Oak Ave",
+  "Cedar Ln",
+  "Birch Ave",
+  "Elm St",
+  "Pine Rd",
+  "Willow Ln",
+  "Ash Ave",
+];
+
+function RoadScene({
+  road,
+  drive,
+  street,
+  arrived,
+}: {
+  road: number;
+  drive: boolean;
+  street: string;
+  arrived: boolean;
+}) {
+  const scroll = road * 110; // px of street scrolled
+  const wrap = ROAD_TILE * ROAD_TILES;
+  const lean = (drive ? 8 : 0) * Math.sin(road * 7);
+  const bob = (drive ? Math.abs(Math.sin(road * 15)) : 0.15) * 3;
   return (
-    <div className="relative h-36 overflow-hidden rounded-2xl border border-sky-200 shadow-sm">
-      <div className="absolute inset-0 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100" />
-      <div className="absolute left-6 top-4 h-8 w-8 rounded-full bg-yellow-300 shadow-[0_0_24px_8px_rgba(253,224,71,0.55)]" />
-      <div className="absolute left-16 top-3 h-3 w-10 rounded-full bg-white/80" />
-      <div className="absolute right-16 top-8 h-3 w-12 rounded-full bg-white/70" />
-      <div className="absolute inset-x-0 top-16 h-px bg-emerald-200/60" />
-      <div className="absolute bottom-0 inset-x-0 h-9 bg-zinc-700">
-        <div className="absolute inset-x-0 top-2 border-t-2 border-dashed border-yellow-400/70" />
-      </div>
+    <div className="relative h-44 overflow-hidden rounded-2xl border border-amber-200/70 shadow-inner">
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-400 via-sky-200 to-emerald-200" />
+      <div className="absolute right-4 top-2 h-9 w-9 rounded-full bg-yellow-300 shadow-[0_0_28px_8px_rgba(253,224,71,0.55)]" />
+      {[
+        { top: 10, size: 52 },
+        { top: 24, size: 74 },
+        { top: 6, size: 42 },
+      ].map((cld, i) => {
+        const cx = (((i * 205 + 40 - scroll * 0.15) % 640) + 640) % 640 - 90;
+        return (
+          <div
+            key={i}
+            className="absolute h-4 rounded-full bg-white/85"
+            style={{ top: `${cld.top}%`, left: cx, width: cld.size }}
+          />
+        );
+      })}
+
+      {/* far skyline, slow parallax */}
       <div
-        className="absolute bottom-2 transition-all duration-200 ease-linear"
-        style={{ left: `calc(${progress * 66}% + 10px)` }}
+        className="absolute inset-x-0"
+        style={{ top: "24%", transform: `translateX(${-(scroll * 0.3) % 800}px)` }}
       >
-        <svg viewBox="0 0 62 46" className="h-14 w-[86px] drop-shadow-md" aria-hidden="true">
-          {arrived && (
-            <rect
-              x={2}
-              y={0}
-              width={58}
-              height={20}
-              rx={7}
-              fill="#fff7db"
-              stroke="#f59e0b"
-              strokeWidth={2}
-            />
-          )}
-          {arrived && (
-            <text
-              x={31}
-              y={13}
-              textAnchor="middle"
-              fontSize={11}
-              fontWeight={800}
-              fill="#92400e"
-            >
-              HOT
-            </text>
-          )}
-          <g>
-            <circle cx={15} cy={36} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
-            <circle cx={15} cy={36} r={2.5} fill="#a8a29e" />
-          </g>
-          <g>
-            <circle cx={46} cy={36} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
-            <circle cx={46} cy={36} r={2.5} fill="#a8a29e" />
-          </g>
-          <path
-            d="M15 36 L46 36 M15 36 L26 18 H34 M34 18 L46 36"
-            stroke="#f59e0b"
-            strokeWidth={3}
-            fill="none"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M20 18 Q26 14 33 15"
-            stroke="#f59e0b"
-            strokeWidth={3}
-            fill="none"
-          />
-          <path d="M24 35 L42 31" stroke="#a8a29e" strokeWidth={2.5} />
-          <rect x={18} y={28} width={10} height={6} rx={1.5} fill="#e11d48" />
-        </svg>
+        <div className="flex">
+          {[0, 1].map((dup) => (
+            <div key={dup} className="flex">
+              {[13, 22, 10, 26, 18, 9, 24, 15].map((h, i) => (
+                <div key={i} className="flex h-7 items-end" style={{ width: 100 }}>
+                  <div className="w-full rounded-t-sm bg-zinc-600/40" style={{ height: h }} />
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="absolute bottom-1 right-3">
-        <svg viewBox="0 0 66 56" className="h-12 w-14 drop-shadow-md" aria-hidden="true">
-          <polygon points="33,2 2,24 64,24" fill="#b45309" />
-          <rect x={8} y={24} width={50} height={28} rx={2} fill="#fcd34d" />
-          <rect x={4} y={30} width={4} height={4} fill="#b45309" />
-          <rect x={58} y={30} width={4} height={4} fill="#b45309" />
-          <rect x={28} y={34} width={12} height={18} fill="#7c2d12" />
-          <rect x={10} y={28} width={5} height={5} fill="#f99b3b" />
-        </svg>
+
+      {/* road */}
+      <div className="absolute inset-x-0 bottom-0 h-[32%]">
+        <div className="absolute inset-0 bg-zinc-700" />
+        <div className="absolute inset-x-0 top-1 h-2.5 bg-zinc-300" />
+        <div
+          className="absolute left-0 top-[42%] h-[3px] w-full"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(90deg, rgba(255,255,255,0.3) 0 10px, transparent 10px 90px)",
+            transform: `translateX(${-(scroll % 100)}px)`,
+          }}
+        />
+        <div
+          className="absolute left-0 top-[58%] h-[3px] w-full"
+          style={{
+            backgroundImage:
+              "repeating-linear-gradient(90deg, rgba(251,191,36,0.85) 0 14px, transparent 14px 54px)",
+            transform: `translateX(${-(scroll % 54)}px)`,
+          }}
+        />
       </div>
+
+      {/* street props scrolling past */}
+      {Array.from({ length: ROAD_TILES }).map((_, i) => {
+        const x = (((i * ROAD_TILE - scroll) % wrap) + wrap) % wrap - 60;
+        return (
+          <div key={i} className="absolute" style={{ bottom: "32.5%", left: x }}>
+            <StreetTile index={i} />
+          </div>
+        );
+      })}
+
+      {/* destination sign pin */}
+      <div className="absolute bottom-[30%] left-3 z-10">
+        <div className="flex items-center gap-1.5 rounded-md bg-emerald-800 px-2 py-1 shadow-md">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300" />
+          <span className="text-[9px] font-black uppercase tracking-wider text-white">
+            {street}
+          </span>
+        </div>
+      </div>
+
+      {/* scooter */}
+      <div
+        className="absolute bottom-[6%] left-1/2 z-10"
+        style={{
+          transform: `translateX(-50%) rotate(${arrived ? 0 : lean}deg) translateY(${
+            arrived ? 0 : -bob
+          }px)`,
+          transition: drive ? "none" : "transform 0.4s ease",
+        }}
+      >
+        <Scooter />
+      </div>
+
+      {drive && !arrived && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-1/2 overflow-hidden">
+          {[18, 34, 52, 70, 86].map((top, i) => (
+            <span key={i} className="speedstreak" style={{ top: `${top}%`, animationDelay: `${i * 0.12}s` }} />
+          ))}
+        </div>
+      )}
+
       {arrived && (
-        <div className="absolute inset-0 grid place-items-center bg-emerald-950/40">
+        <div className="pointer-events-none absolute inset-0 z-30 grid place-items-center bg-emerald-950/40">
           <div className="anim-pop rounded-full bg-emerald-600 px-5 py-2 text-sm font-black text-white shadow-lg">
             Delivered!
           </div>
@@ -1032,22 +1095,155 @@ function BikeScene({ progress }: { progress: number }) {
   );
 }
 
+function Scooter() {
+  return (
+    <svg viewBox="0 0 62 46" className="h-16 w-[104px] drop-shadow-md" aria-hidden="true">
+      <g>
+        <circle cx={15} cy={36} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
+        <circle cx={15} cy={36} r={2.5} fill="#a8a29e" />
+      </g>
+      <g>
+        <circle cx={46} cy={36} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
+        <circle cx={46} cy={36} r={2.5} fill="#a8a29e" />
+      </g>
+      <path
+        d="M15 36 L46 36 M15 36 L26 18 H34 M34 18 L46 36"
+        stroke="#f59e0b"
+        strokeWidth={3}
+        fill="none"
+        strokeLinejoin="round"
+      />
+      <path d="M20 18 Q26 14 33 15" stroke="#f59e0b" strokeWidth={3} fill="none" />
+      <path d="M24 35 L42 31" stroke="#a8a29e" strokeWidth={2.5} />
+      <rect x={18} y={28} width={10} height={6} rx={1.5} fill="#e11d48" />
+    </svg>
+  );
+}
+
+function StreetTile({ index }: { index: number }) {
+  const k = index % 4;
+  if (k === 0) {
+    return <Building i={index} />;
+  }
+  if (k === 1) {
+    return (
+      <div className="flex items-end gap-2">
+        {index % 8 === 1 && <StreetSign name={CROSS_STREETS[Math.floor(index / 2) % CROSS_STREETS.length]} />}
+        <Building i={index} tall />
+      </div>
+    );
+  }
+  if (k === 2) {
+    return (
+      <div className="flex items-end gap-1.5">
+        <Tree />
+        <Tree />
+        <Lamp />
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-end gap-2">
+      <Building i={index + 3} />
+      <Tree />
+    </div>
+  );
+}
+
+function Building({ i, tall }: { i: number; tall?: boolean }) {
+  const palette = ["#b4693f", "#e0d7c6", "#90a08e", "#cc7f63"];
+  const color = palette[i % palette.length];
+  const roof = palette[(i + 1) % palette.length];
+  const w = tall ? 128 : 104;
+  const h = tall ? 84 : 58;
+  const cols = tall ? 5 : 3;
+  const rows = tall ? 5 : 3;
+  return (
+    <div className="relative" style={{ width: w, height: h }}>
+      <div
+        className="absolute left-1/2 top-0 z-10 h-2.5 w-[112%] -translate-x-1/2 rounded-sm"
+        style={{ backgroundColor: roof }}
+      />
+      <div
+        className="absolute inset-x-0 bottom-0 rounded-t-md border border-black/10"
+        style={{ backgroundColor: color, height: h - 8 }}
+      >
+        <div
+          className="grid content-center gap-x-2 gap-y-1.5 px-3 pt-2"
+          style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+        >
+          {Array.from({ length: cols * rows }).map((_, wi) => {
+            const lit = (wi + i * 2) % 3 === 0;
+            return (
+              <div
+                key={wi}
+                className="h-2 rounded-[1px]"
+                style={{
+                  backgroundColor: lit ? "#fde68a" : "#3f3f46",
+                  opacity: lit ? 0.95 : 0.5,
+                }}
+              />
+            );
+          })}
+        </div>
+        <div className="absolute bottom-0 left-1/2 h-6 w-7 -translate-x-1/2 rounded-t bg-[#4b3f35]" />
+      </div>
+    </div>
+  );
+}
+
+function Tree() {
+  return (
+    <div className="relative" style={{ width: 34, height: 48 }}>
+      <div className="absolute bottom-0 left-1/2 h-7 w-2 -translate-x-1/2 rounded-sm bg-[#7c5a3a]" />
+      <div className="absolute bottom-6 left-1/2 h-10 w-14 -translate-x-1/2 rounded-[50%] bg-[#7aa66b]" />
+      <div className="absolute bottom-9 left-2 h-6 w-6 rounded-[50%] bg-[#6b9c5c]" />
+    </div>
+  );
+}
+
+function Lamp() {
+  return (
+    <div className="relative" style={{ width: 22, height: 58 }}>
+      <div className="absolute bottom-0 left-1/2 h-[54px] w-[3px] -translate-x-1/2 rounded bg-zinc-800" />
+      <div className="absolute bottom-[50px] left-1/2 h-[3px] w-6 -translate-x-1/2 rounded bg-zinc-800" />
+      <div className="absolute bottom-[50px] left-[16px] h-4 w-4 rounded-full bg-amber-200 shadow-[0_0_12px_4px_rgba(253,230,138,0.6)]" />
+    </div>
+  );
+}
+
+function StreetSign({ name }: { name: string }) {
+  return (
+    <div className="relative" style={{ width: 74, height: 40 }}>
+      <div className="absolute bottom-0 left-6 h-10 w-1.5 bg-zinc-700" />
+      <div className="absolute top-0 flex h-9 w-full items-center justify-center rounded-md bg-emerald-800 px-2 shadow-md">
+        <span className="text-[9px] font-black uppercase tracking-wider text-white">
+          {name}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function DeliveryPanel({
+  road,
   street,
   warmth,
   blocksLeft,
   cooldown,
   pedal,
 }: {
+  road: number;
   street: string;
   warmth: number;
   blocksLeft: number;
   cooldown: number;
   pedal: () => void;
 }) {
-  const progress = 1 - blocksLeft / DELIVERY_BLOCKS;
   const warmthPct = Math.round(warmth);
   const canPedal = cooldown <= 0;
+  const drive = cooldown > 0;
+  const arrived = blocksLeft <= 0;
   const warmColor =
     warmthPct >= 70
       ? "from-emerald-500 to-emerald-400"
@@ -1102,7 +1298,7 @@ function DeliveryPanel({
           </span>
         </div>
       </div>
-      <BikeScene progress={progress} />
+      <RoadScene road={road} drive={drive} street={street} arrived={arrived} />
       <button
         onClick={pedal}
         disabled={!canPedal}

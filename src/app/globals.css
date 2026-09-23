@@ -134,6 +134,28 @@ body {
   animation: toastin 0.25s ease-out;
 }
 
+@keyframes whoosh {
+  0% {
+    left: 105%;
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.6;
+  }
+  100% {
+    left: -45%;
+    opacity: 0;
+  }
+}
+.speedstreak {
+  position: absolute;
+  height: 2px;
+  width: 28%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.85), transparent);
+  animation: whoosh 0.6s linear infinite;
+}
+
 .shop-bg {
   background:
     radial-gradient(1100px 700px at 28% -8%, #fef9ec 0%, #fbeec8 45%, #f9d38b 78%, #e8b873 100%);
