@@ -433,22 +433,36 @@ export default function WaffleGame() {
   if (screen === "start") {
     return (
       <Panel>
-        <h1 className="text-3xl font-black tracking-tight text-amber-900">
-          Waffle Prime
-        </h1>
-        <p className="text-sm text-amber-800/80">
-          Run the stand. Mix the batter, nail the cook, serve what each customer
-          ordered.
-        </p>
-        <ol className="w-full max-w-xs space-y-1.5 text-left text-sm text-amber-900">
-          <li>1. Add the 3 recipe ingredients in order.</li>
-          <li>2. Close the iron and open it in the GOLDEN zone.</li>
-          <li>3. Add every topping on the ticket, then serve.</li>
-          <li>4. Pedal to the address before the waffle cools.</li>
+        <div className="flex flex-col items-center gap-3">
+          <div className="grid h-16 w-16 place-items-center rounded-3xl bg-amber-700 shadow-lg">
+            <MiniWaffle className="h-11 w-11" />
+          </div>
+          <h1 className="text-3xl font-black tracking-tight text-amber-950">
+            Waffle Prime
+          </h1>
+          <p className="text-sm text-amber-800/80">
+            Run the stand. Mix the batter, nail the cook, serve what each customer
+            ordered.
+          </p>
+        </div>
+        <ol className="w-full max-w-xs space-y-2.5 text-left text-sm text-amber-900">
+          {[
+            "Add the 3 recipe ingredients in order.",
+            "Close the iron and open it in the GOLDEN zone.",
+            "Add every topping on the ticket, then serve.",
+            "Pedal to the address before the waffle cools.",
+          ].map((item, i) => (
+            <li key={item} className="flex items-center gap-2.5">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-amber-200 text-xs font-black text-amber-900">
+                {i + 1}
+              </span>
+              <span>{item}</span>
+            </li>
+          ))}
         </ol>
         <button
           onClick={startOver}
-          className="rounded-full bg-amber-700 px-8 py-3 text-lg font-bold text-amber-50 shadow-lg transition hover:bg-amber-800 active:scale-95"
+          className="btn-primary rounded-full px-8 py-3 text-lg font-bold"
         >
           Open the Shop
         </button>
@@ -459,20 +473,20 @@ export default function WaffleGame() {
   if (screen === "over") {
     return (
       <Panel>
-        <h1 className="text-2xl font-black text-amber-900">Out of waffle love!</h1>
+        <h1 className="text-2xl font-black text-amber-950">Out of waffle love!</h1>
         <p className="text-amber-800/80">
           You served{" "}
-          <span className="font-bold text-amber-900">{served} orders</span> and
-          earned <span className="font-bold text-amber-900">${score}</span>.
+          <span className="font-black text-amber-950">{served} orders</span> and
+          earned <span className="font-black text-amber-950">${score}</span>.
         </p>
-        <div className="flex h-40 w-40 items-center justify-center">
-          <div className="anim-floaty h-32 w-32 opacity-90">
+        <div className="flex h-44 w-44 items-center justify-center rounded-full border-4 border-dashed border-amber-300 bg-amber-100/60">
+          <div className="anim-floaty h-32 w-32 drop-shadow-lg">
             <TopWaffle doneness={0.55} toppings={["syrup", "whipped"]} />
           </div>
         </div>
         <button
           onClick={startOver}
-          className="rounded-full bg-amber-700 px-8 py-3 text-lg font-bold text-amber-50 shadow-lg transition hover:bg-amber-800 active:scale-95"
+          className="btn-primary rounded-full px-8 py-3 text-lg font-bold"
         >
           Open Again
         </button>
@@ -480,163 +494,243 @@ export default function WaffleGame() {
     );
   }
 
+  const inGoldenZone = cook >= GOLDEN_MIN && cook <= GOLDEN_MAX;
+
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col items-center gap-4 px-4 py-8">
-      <header className="flex w-full items-center justify-between text-amber-950">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-xl font-black tracking-tight">Waffle Prime</h1>
-          <span className="text-sm text-amber-800/70">Order #{served + 1}</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-lg font-bold">
-            <span className="text-xs font-semibold uppercase tracking-wider text-amber-700/70">
-              cash{" "}
-            </span>
-            ${score}
+    <div className="shop-bg flex min-h-[100dvh] w-full items-start justify-center px-3 py-5 sm:px-4 sm:py-8">
+      <div className="flex w-full max-w-3xl flex-col items-center gap-3 sm:gap-4">
+        <header className="flex w-full items-center justify-between rounded-3xl border border-amber-200 bg-white/70 px-4 py-2.5 shadow-sm backdrop-blur sm:px-5 sm:py-3">
+          <div className="flex items-center gap-3">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-gradient-to-b from-amber-600 to-amber-800 shadow-md sm:h-11 sm:w-11">
+              <MiniWaffle className="h-7 w-7 sm:h-8 sm:w-8" />
+            </div>
+            <div className="leading-tight">
+              <div className="text-base font-black tracking-tight text-amber-950 sm:text-lg">
+                Waffle Prime
+              </div>
+              <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700/70 sm:text-[11px]">
+                order{" "}
+                <span className="text-amber-900">#{served + 1}</span>
+              </div>
+            </div>
           </div>
-          <div aria-label={`${hearts} hearts left`} className="flex items-center gap-1">
-            {Array.from({ length: 3 }).map((_, i) => (
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="flex items-center gap-1.5 rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 sm:px-3">
+              <span className="text-[10px] font-black uppercase tracking-wider text-amber-600">
+                cash
+              </span>
+              <span className="text-base font-black text-amber-950 sm:text-lg">
+                ${score}
+              </span>
+            </div>
+            <div
+              aria-label={`${hearts} hearts left`}
+              className="flex items-center gap-1"
+            >
+              {Array.from({ length: 3 }).map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-3 w-3 rotate-45 rounded-[3px] border transition sm:h-3.5 sm:w-3.5 ${
+                    i < hearts
+                      ? "border-red-500 bg-red-500 shadow-[0_2px_4px_rgba(220,38,38,0.5)]"
+                      : "border-red-300/60 bg-transparent"
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        </header>
+
+        <div className="flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-200 bg-amber-50/80 px-4 py-2.5 text-center text-sm font-bold text-amber-900 shadow-sm sm:py-3">
+          <span
+            className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+              phase === "delivery"
+                ? "bg-emerald-500"
+                : phase === "cook"
+                  ? "bg-orange-500"
+                  : "bg-amber-500"
+            }`}
+          />
+          {phase === "mix" && (
+            <span>Mix the batter: add the 3 ingredients on the recipe card, in order.</span>
+          )}
+          {phase === "cook" && (
+            <span>
+              {cooking
+                ? "Click (or press space) to open the iron when the needle hits GOLDEN!"
+                : "Pour the batter and close the iron."}
+            </span>
+          )}
+          {phase === "serve" && (
+            <span>Add what the customer ordered, garnish how you like, then serve.</span>
+          )}
+          {phase === "delivery" && (
+            <span>Pedal to {street} fast — the warm meter is draining!</span>
+          )}
+        </div>
+
+        {toast && (
+          <div className="anim-toast z-20 rounded-full border border-amber-600/70 bg-amber-950 px-5 py-2 text-sm font-bold text-amber-100 shadow-xl">
+            {toast}
+          </div>
+        )}
+
+        <div className="grid w-full grid-cols-1 gap-4 md:grid-cols-2 sm:gap-5">
+          <section className="card-paper flex flex-col items-center gap-3 rounded-3xl border border-amber-200 p-5 shadow-sm sm:gap-4">
+            <div className="relative h-56 w-56 sm:h-64 sm:w-64">
+              <div className="grid h-full w-full place-items-center rounded-[2rem] border-[10px] border-zinc-700 bg-gradient-to-br from-zinc-600 via-zinc-800 to-zinc-950 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1),0_24px_44px_-22px_rgba(0,0,0,0.7)]">
+                <div className="relative h-[calc(100%-1rem)] w-[calc(100%-1rem)] overflow-hidden rounded-2xl bg-zinc-900 p-2">
+                  <CellPlate className="opacity-80" />
+                  {phase !== "mix" && (
+                    <div className="absolute inset-2">
+                      <TopWaffle doneness={doneness} toppings={toppings} />
+                    </div>
+                  )}
+                  {phase === "cook" && cooking && (
+                    <div className="steam pointer-events-none absolute inset-x-0 bottom-1 flex items-end justify-center gap-2 overflow-hidden">
+                      <span style={{ animationDelay: "0s" }} />
+                      <span style={{ animationDelay: "0.4s" }} />
+                      <span style={{ animationDelay: "0.8s" }} />
+                    </div>
+                  )}
+                  {inGoldenZone && (
+                    <div className="pointer-events-none absolute inset-0 rounded-2xl shadow-[inset_0_0_36px_14px_rgba(251,191,36,0.5)]" />
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-amber-700">
               <span
-                key={i}
-                className={`h-3.5 w-3.5 rotate-45 rounded-[3px] border ${
-                  i < hearts
-                    ? "border-red-500 bg-red-500"
-                    : "border-red-300/60 bg-transparent"
+                className={`h-1.5 w-1.5 rounded-full ${
+                  phase === "mix"
+                    ? "bg-amber-400"
+                    : phase === "cook"
+                      ? cooking
+                        ? "bg-orange-500 animate-pulse"
+                        : "bg-orange-400"
+                      : phase === "serve"
+                        ? rating === "golden"
+                          ? "bg-amber-500"
+                          : "bg-amber-400"
+                        : "bg-emerald-500"
                 }`}
               />
-            ))}
-          </div>
-        </div>
-      </header>
-
-      <div className="w-full rounded-2xl bg-amber-100/70 p-3 text-center text-sm font-semibold text-amber-900 shadow-sm">
-        {phase === "mix" && (
-          <span>Mix the batter: add the 3 ingredients on the recipe card, in order.</span>
-        )}
-        {phase === "cook" && (
-          <span>
-            {cooking
-              ? "Click (or press space) to open the iron when the needle hits GOLDEN!"
-              : "Pour the batter and close the iron."}
-          </span>
-        )}
-        {phase === "serve" && (
-          <span>Add what the customer ordered, garnish how you like, then serve.</span>
-        )}
-        {phase === "delivery" && (
-          <span>Pedal to {street} fast — the warm meter is draining!</span>
-        )}
-      </div>
-
-      {toast && (
-        <div className="anim-toast rounded-full bg-amber-950 px-5 py-2 text-sm font-semibold text-amber-100 shadow-lg">
-          {toast}
-        </div>
-      )}
-
-      <div className="grid w-full grid-cols-1 gap-5 md:grid-cols-2">
-        <section className="flex flex-col items-center gap-3">
-          <div className="relative h-60 w-60 rounded-3xl border-8 border-zinc-800 bg-zinc-900 p-1.5 shadow-2xl sm:h-72 sm:w-72">
-            <div className="absolute inset-2.5 overflow-hidden rounded-2xl">
-              <CellPlate className="opacity-70" />
+              {phase === "mix" && "prepare the batter"}
+              {phase === "cook" && (cooking ? "cooking..." : "ready to cook")}
+              {phase === "serve" &&
+                (rating === "golden"
+                  ? "golden grade"
+                  : rating === "crisp"
+                    ? "crispy grade"
+                    : "build your waffle")}
+              {phase === "delivery" && "hot delivery zone"}
             </div>
-            {phase !== "mix" && (
-              <div className="absolute inset-1.5">
-                <TopWaffle doneness={doneness} toppings={toppings} />
-              </div>
-            )}
-            {phase === "cook" && cooking && (
-              <div className="steam pointer-events-none absolute inset-x-0 bottom-2 flex items-end justify-center gap-2 overflow-hidden">
-                <span style={{ animationDelay: "0s" }} />
-                <span style={{ animationDelay: "0.4s" }} />
-                <span style={{ animationDelay: "0.8s" }} />
-              </div>
-            )}
-          </div>
-          <div className="text-xs uppercase tracking-wider text-amber-800/60">
-            {phase === "serve" && rating === "golden" && "golden grade"}
-            {phase === "serve" && rating === "crisp" && "crispy grade"}
-          </div>
-        </section>
+          </section>
 
-        <section className="flex flex-col gap-4">
-          {phase === "mix" && (
-            <>
-              <div className="rounded-2xl bg-amber-50 p-3 shadow-sm">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-700/70">
-                  Recipe card
+          <section className="flex flex-col gap-3 sm:gap-4">
+            {phase === "mix" && (
+              <>
+                <div className="card-paper rounded-2xl border border-amber-200 p-3 shadow-sm sm:p-4">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-700">
+                      <MiniWaffle className="h-4 w-4" />
+                      Recipe card
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700/70">
+                      {step}/{order.recipe.length}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {order.recipe.map((rid, i) => {
+                      const done = i < step;
+                      const now = i === step;
+                      return (
+                        <div key={rid} className="flex items-center gap-1.5">
+                          {i > 0 && (
+                            <span className="text-sm font-black text-amber-400">→</span>
+                          )}
+                          <div
+                            className={`relative flex flex-col items-center gap-1 rounded-2xl border-2 px-2.5 py-2 transition ${
+                              done
+                                ? "border-emerald-300 bg-emerald-50"
+                                : now
+                                  ? "anim-pop border-amber-400 bg-amber-100 ring-2 ring-amber-300"
+                                  : "border-amber-200 bg-white"
+                            }`}
+                          >
+                            {done && (
+                              <span className="absolute -right-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-black text-white shadow">
+                                ✓
+                              </span>
+                            )}
+                            <IngredientGlyph id={rid} className="h-9 w-9" />
+                            <span
+                              className={`grid h-5 w-5 place-items-center rounded-full text-xs font-black ${
+                                done
+                                  ? "bg-emerald-200 text-emerald-800"
+                                  : now
+                                    ? "bg-amber-500 text-white"
+                                    : "bg-zinc-100 text-zinc-500"
+                              }`}
+                            >
+                              {i + 1}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {order.recipe.map((rid, i) => (
-                    <div key={rid} className="flex items-center gap-2">
-                      {i > 0 && <span className="text-amber-400">→</span>}
-                      <div
-                        className={`flex flex-col items-center rounded-xl border px-2.5 py-1.5 ${
-                          i < step
-                            ? "border-emerald-300 bg-emerald-100"
-                            : i === step
-                              ? "anim-pop border-amber-400 bg-amber-200"
-                              : "border-amber-200 bg-white/70"
+                <div className="card-paper rounded-2xl border border-amber-200 p-3 shadow-sm sm:p-4">
+                  <div className="mb-2 text-xs font-bold uppercase tracking-wider text-amber-700">
+                    Pantry shelf
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {pantry.map((id) => (
+                      <button
+                        key={id}
+                        onClick={() => tryIngredient(id)}
+                        className={`btn-soft flex flex-col items-center gap-1 rounded-2xl p-2 hover:-translate-y-0.5 ${
+                          shakeId === id
+                            ? "anim-shake !border-red-400"
+                            : ""
                         }`}
                       >
-                        <IngredientGlyph id={rid} className="h-9 w-9" />
-                        <span className="mt-1 text-sm font-bold text-amber-900">
-                          {i + 1}
+                        <IngredientGlyph id={id} className="h-11 w-11" />
+                        <span className="text-[11px] font-bold text-amber-900">
+                          {INGREDIENTS.find((i) => i.id === id)?.name}
                         </span>
-                      </div>
-                    </div>
-                  ))}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
-              <div className="rounded-2xl bg-amber-50 p-3 shadow-sm">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-700/70">
-                  Pantry
-                </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {pantry.map((id) => (
-                    <button
-                      key={id}
-                      onClick={() => tryIngredient(id)}
-                      className={`flex flex-col items-center gap-1 rounded-xl border bg-white p-2 shadow-sm transition ${
-                        shakeId === id
-                          ? "anim-shake border-red-300"
-                          : "border-amber-200 hover:border-amber-400 active:scale-95"
-                      }`}
-                    >
-                      <IngredientGlyph id={id} className="h-11 w-11" />
-                      <span className="text-[11px] font-semibold text-amber-900">
-                        {INGREDIENTS.find((i) => i.id === id)?.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
-          {phase === "cook" && (
-            <CookPanel cook={cook} cooking={cooking} toggleIron={toggleIron} />
-          )}
+            {phase === "cook" && (
+              <CookPanel cook={cook} cooking={cooking} toggleIron={toggleIron} />
+            )}
 
-          {phase === "serve" && (
-            <ServePanel
-              order={order}
-              toppings={toppings}
-              addTopping={addTopping}
-              serve={serve}
-            />
-          )}
+            {phase === "serve" && (
+              <ServePanel
+                order={order}
+                toppings={toppings}
+                addTopping={addTopping}
+                serve={serve}
+              />
+            )}
 
-          {phase === "delivery" && (
-            <DeliveryPanel
-              street={street}
-              warmth={warmth}
-              blocksLeft={blocksLeft}
-              cooldown={cooldown}
-              pedal={pedal}
-            />
-          )}
-        </section>
+            {phase === "delivery" && (
+              <DeliveryPanel
+                street={street}
+                warmth={warmth}
+                blocksLeft={blocksLeft}
+                cooldown={cooldown}
+                pedal={pedal}
+              />
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );
@@ -644,9 +738,40 @@ export default function WaffleGame() {
 
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <div className="mx-auto flex min-h-[60vh] w-full max-w-md flex-col items-center justify-center gap-6 px-6 text-center">
-      {children}
+    <div className="shop-bg flex min-h-[100dvh] w-full items-center justify-center px-4 py-10">
+      <div className="card-paper flex w-full max-w-md flex-col items-center gap-5 rounded-3xl border border-amber-200 p-8 text-center shadow-2xl">
+        {children}
+      </div>
     </div>
+  );
+}
+
+function MiniWaffle({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      className={`select-none ${className ?? ""}`}
+      aria-hidden="true"
+    >
+      <rect x={1} y={1} width={30} height={30} rx={6} fill="#d39b2e" />
+      {[0, 1, 2].map((r) =>
+        [0, 1, 2].map((c) => {
+          const x = 4 + c * 8;
+          const y = 4 + r * 8;
+          return (
+            <rect
+              key={`${r}-${c}`}
+              x={x}
+              y={y}
+              width={7}
+              height={7}
+              rx={1.6}
+              fill="#f2c96a"
+            />
+          );
+        })
+      )}
+    </svg>
   );
 }
 
@@ -660,41 +785,54 @@ function CookPanel({
   toggleIron: () => void;
 }) {
   const pct = Math.round(cook * 100);
+  const inGolden = pct >= 38 && pct <= 60;
   return (
     <div className="flex flex-1 flex-col justify-center gap-4">
-      <div className="rounded-2xl bg-amber-50 p-4 shadow-sm">
-        <div className="mb-2 flex justify-between text-xs font-semibold text-amber-700/70">
+      <div className="card-paper rounded-2xl border border-amber-200 p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-700">
           <span>Doneness</span>
-          <span>{pct}%</span>
+          <span
+            className={`rounded-full px-2 py-0.5 ${
+              inGolden ? "bg-amber-200 text-amber-900" : "bg-amber-100 text-amber-700"
+            }`}
+          >
+            {pct}%
+          </span>
         </div>
-        <div className="relative h-5 w-full rounded-full bg-zinc-200">
+        <div
+          className={`relative h-5 w-full overflow-hidden rounded-full border border-zinc-200 bg-zinc-100 ${
+            inGolden ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-white" : ""
+          }`}
+        >
           {ZONES.map((z) => (
             <div
               key={z.label}
-              className="absolute top-0 h-full first:rounded-l-full last:rounded-r-full"
+              className="absolute top-0 h-full transition-colors first:rounded-l-full last:rounded-r-full"
               style={{
                 left: `${z.from * 100}%`,
                 width: `${(z.to - z.from) * 100}%`,
                 backgroundColor: toppingColorForZone(z.label),
-                opacity: z.label === "GOLDEN" ? 1 : 0.65,
+                opacity: z.label === "GOLDEN" ? 0.95 : 0.55,
               }}
               title={z.label}
             />
           ))}
           <div
-            className="absolute top-[-5px] z-10 h-9 w-1.5 rounded-full bg-zinc-900 shadow"
-            style={{ left: `calc(${pct}% - 3px)` }}
+            className="absolute top-[46%] z-10 h-8 w-2 -translate-y-1/2 rounded-full bg-zinc-900 shadow ring-1 ring-white"
+            style={{ left: `calc(${pct}% - 4px)` }}
           />
         </div>
-        <div className="mt-1 flex justify-between text-[11px] font-semibold uppercase tracking-wide text-amber-700/60">
-          <span>raw</span>
-          <span className="text-amber-700">golden</span>
-          <span>burnt</span>
+        <div className="mt-2 flex items-center justify-between text-[11px] font-bold uppercase tracking-wide">
+          <span className="text-zinc-400">raw</span>
+          <span className={inGolden ? "text-amber-600" : "text-amber-700/60"}>
+            golden
+          </span>
+          <span className="text-zinc-400">burnt</span>
         </div>
       </div>
       <button
         onClick={toggleIron}
-        className="rounded-full bg-amber-700 px-8 py-3 text-lg font-bold text-amber-50 shadow-lg transition hover:bg-amber-800 active:scale-95"
+        className="btn-primary rounded-full px-8 py-3 text-lg font-bold"
       >
         {cooking ? "Open the Iron!" : "Close & Start Cooking"}
       </button>
@@ -732,56 +870,74 @@ function ServePanel({
   serve: () => void;
 }) {
   const count = (id: ToppingId) => toppings.filter((t) => t === id).length;
+  const allSet = order.required.every((r) => count(r) > 0);
   return (
     <div className="flex flex-1 flex-col justify-center gap-4">
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-700/70">
-          Ticket
+      <div className="relative rounded-2xl border border-amber-200 bg-[#fffef8] px-5 pb-4 pt-5 font-mono shadow-sm">
+        <div className="absolute inset-x-4 top-2 h-1 rounded border-t-2 border-dashed border-amber-300" />
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-[0.2em] text-amber-700">
+          Waffle Prime
         </div>
-        <div className="font-bold text-amber-950">{order.name}</div>
-        <ul className="mt-2 space-y-1 text-sm text-amber-900">
+        <div className="text-[10px] uppercase tracking-widest text-amber-800/60">
+          Order ticket
+        </div>
+        <div className="mt-2 text-lg font-black leading-tight text-amber-950">
+          {order.name}
+        </div>
+        <ul className="mt-3 space-y-1.5 text-sm text-amber-900">
           {order.required.map((t) => {
             const has = count(t) > 0;
             return (
               <li key={t} className="flex items-center gap-2">
                 <span
-                  className={`inline-block h-3 w-3 rounded-full border ${
-                    has ? "border-emerald-500 bg-emerald-400" : "border-zinc-300 bg-white"
+                  className={`grid h-4 w-4 place-items-center rounded-full border font-bold text-[10px] ${
+                    has
+                      ? "border-emerald-500 bg-emerald-500 text-white"
+                      : "border-amber-300 bg-white text-amber-300"
                   }`}
-                />
-                <span>{TOPPINGS.find((x) => x.id === t)?.name}</span>
-                {has && <span className="text-emerald-600">ok</span>}
+                >
+                  {has ? "✓" : ""}
+                </span>
+                <span className={has ? "line-through decoration-emerald-400" : ""}>
+                  {TOPPINGS.find((x) => x.id === t)?.name}
+                </span>
               </li>
             );
           })}
         </ul>
+        <div className="mt-3 border-t border-dashed border-amber-300 pt-2 text-[11px] font-bold text-amber-700">
+          {allSet ? "Ready to ring up" : "Add the items above"}
+        </div>
       </div>
-      <div className="rounded-2xl bg-amber-50 p-3 shadow-sm">
-        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-amber-700/70">
+      <div className="card-paper rounded-2xl border border-amber-200 p-3 shadow-sm">
+        <div className="mb-2 text-xs font-bold uppercase tracking-wider text-amber-700">
           Toppings
         </div>
         <div className="flex flex-wrap justify-center gap-2">
-          {TOPPINGS.map((t) => (
-            <button
-              key={t.id}
-              onClick={() => addTopping(t.id)}
-              className="inline-flex items-center gap-1.5 rounded-full border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-900 shadow-sm transition hover:border-amber-500 active:scale-95"
-            >
-              <span
-                className="inline-block h-3 w-3 rounded-full"
-                style={{ backgroundColor: toppingColor(t.id) }}
-              />
-              {t.name}
-              {count(t.id) > 0 && (
-                <span className="text-amber-500">x{count(t.id)}</span>
-              )}
-            </button>
-          ))}
+          {TOPPINGS.map((t) => {
+            const n = count(t.id);
+            return (
+              <button
+                key={t.id}
+                onClick={() => addTopping(t.id)}
+                className={`btn-soft inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-bold ${
+                  n > 0 ? "!border-amber-500 bg-amber-100" : ""
+                } ${n >= 8 ? "opacity-50" : ""}`}
+              >
+                <span
+                  className="inline-block h-3 w-3 rounded-full"
+                  style={{ backgroundColor: toppingColor(t.id) }}
+                />
+                {t.name}
+                {n > 0 && <span className="text-amber-600">x{n}</span>}
+              </button>
+            );
+          })}
         </div>
       </div>
       <button
         onClick={serve}
-        className="rounded-full bg-emerald-600 px-8 py-3 text-lg font-bold text-white shadow-lg transition hover:bg-emerald-700 active:scale-95"
+        className="btn-go rounded-full px-8 py-3 text-lg font-bold disabled:opacity-40"
       >
         Serve & Ring Up
       </button>
@@ -790,42 +946,73 @@ function ServePanel({
 }
 
 function BikeScene({ progress }: { progress: number }) {
+  const arrived = progress >= 1;
   return (
-    <div className="relative h-32 overflow-hidden rounded-2xl bg-emerald-950">
-      <div className="absolute left-2 top-2 rounded bg-emerald-800/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-100">
-        route
-      </div>
-      <div className="absolute bottom-0 inset-x-0 h-7 bg-zinc-800">
-        <div className="absolute inset-x-0 top-1/2 h-0.5 -translate-y-1/2 border-t-2 border-dashed border-yellow-400/60" />
+    <div className="relative h-36 overflow-hidden rounded-2xl border border-sky-200 shadow-sm">
+      <div className="absolute inset-0 bg-gradient-to-b from-sky-300 via-sky-200 to-emerald-100" />
+      <div className="absolute left-6 top-4 h-8 w-8 rounded-full bg-yellow-300 shadow-[0_0_24px_8px_rgba(253,224,71,0.55)]" />
+      <div className="absolute left-16 top-3 h-3 w-10 rounded-full bg-white/80" />
+      <div className="absolute right-16 top-8 h-3 w-12 rounded-full bg-white/70" />
+      <div className="absolute inset-x-0 top-16 h-px bg-emerald-200/60" />
+      <div className="absolute bottom-0 inset-x-0 h-9 bg-zinc-700">
+        <div className="absolute inset-x-0 top-2 border-t-2 border-dashed border-yellow-400/70" />
       </div>
       <div
-        className="absolute bottom-2 transition-all duration-150 ease-linear"
-        style={{ left: `calc(${progress * 78}% + 6px)` }}
+        className="absolute bottom-2 transition-all duration-200 ease-linear"
+        style={{ left: `calc(${progress * 66}% + 10px)` }}
       >
-        <svg viewBox="0 0 62 40" className="h-12 w-[74px]" aria-hidden="true">
-          <circle cx={15} cy={30} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
-          <circle cx={15} cy={30} r={2.5} fill="#a8a29e" />
-          <circle cx={46} cy={30} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
-          <circle cx={46} cy={30} r={2.5} fill="#a8a29e" />
+        <svg viewBox="0 0 62 46" className="h-14 w-[86px] drop-shadow-md" aria-hidden="true">
+          {arrived && (
+            <rect
+              x={2}
+              y={0}
+              width={58}
+              height={20}
+              rx={7}
+              fill="#fff7db"
+              stroke="#f59e0b"
+              strokeWidth={2}
+            />
+          )}
+          {arrived && (
+            <text
+              x={31}
+              y={13}
+              textAnchor="middle"
+              fontSize={11}
+              fontWeight={800}
+              fill="#92400e"
+            >
+              HOT
+            </text>
+          )}
+          <g>
+            <circle cx={15} cy={36} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
+            <circle cx={15} cy={36} r={2.5} fill="#a8a29e" />
+          </g>
+          <g>
+            <circle cx={46} cy={36} r={9} fill="none" stroke="#f5f5f4" strokeWidth={3.5} />
+            <circle cx={46} cy={36} r={2.5} fill="#a8a29e" />
+          </g>
           <path
-            d="M15 30 L46 30 M15 30 L26 12 H34 M34 12 L46 30"
+            d="M15 36 L46 36 M15 36 L26 18 H34 M34 18 L46 36"
             stroke="#f59e0b"
             strokeWidth={3}
             fill="none"
             strokeLinejoin="round"
           />
           <path
-            d="M20 12 Q26 8 33 9"
+            d="M20 18 Q26 14 33 15"
             stroke="#f59e0b"
             strokeWidth={3}
             fill="none"
           />
-          <path d="M24 29 L42 25" stroke="#a8a29e" strokeWidth={2.5} />
-          <rect x={18} y={22} width={10} height={6} rx={1.5} fill="#e11d48" />
+          <path d="M24 35 L42 31" stroke="#a8a29e" strokeWidth={2.5} />
+          <rect x={18} y={28} width={10} height={6} rx={1.5} fill="#e11d48" />
         </svg>
       </div>
-      <div className="absolute bottom-2 right-2">
-        <svg viewBox="0 0 66 56" className="h-12 w-14" aria-hidden="true">
+      <div className="absolute bottom-1 right-3">
+        <svg viewBox="0 0 66 56" className="h-12 w-14 drop-shadow-md" aria-hidden="true">
           <polygon points="33,2 2,24 64,24" fill="#b45309" />
           <rect x={8} y={24} width={50} height={28} rx={2} fill="#fcd34d" />
           <rect x={4} y={30} width={4} height={4} fill="#b45309" />
@@ -834,6 +1021,13 @@ function BikeScene({ progress }: { progress: number }) {
           <rect x={10} y={28} width={5} height={5} fill="#f99b3b" />
         </svg>
       </div>
+      {arrived && (
+        <div className="absolute inset-0 grid place-items-center bg-emerald-950/40">
+          <div className="anim-pop rounded-full bg-emerald-600 px-5 py-2 text-sm font-black text-white shadow-lg">
+            Delivered!
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -855,39 +1049,55 @@ function DeliveryPanel({
   const warmthPct = Math.round(warmth);
   const canPedal = cooldown <= 0;
   const warmColor =
-    warmthPct >= 70 ? "bg-emerald-500" : warmthPct >= 45 ? "bg-amber-400" : "bg-red-500";
+    warmthPct >= 70
+      ? "from-emerald-500 to-emerald-400"
+      : warmthPct >= 45
+        ? "from-amber-500 to-amber-400"
+        : "from-red-500 to-red-400";
   return (
     <div className="flex flex-1 flex-col justify-center gap-4">
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-amber-700/70">
+      <div className="card-paper rounded-2xl border border-amber-200 p-4 shadow-sm">
+        <div className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-amber-700">
+          <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
           Delivery address
         </div>
-        <div className="font-bold text-amber-950">{street}</div>
-        <div className="mt-2 text-sm font-semibold text-amber-900">
+        <div className="text-lg font-black text-amber-950">{street}</div>
+        <div className="mt-1 flex items-center gap-2 text-sm text-amber-800">
+          <span className="text-amber-500">●</span>
           {blocksLeft > 0
             ? `${blocksLeft} block${blocksLeft > 1 ? "s" : ""} to go`
             : "Arriving!"}
         </div>
       </div>
-      <div className="rounded-2xl bg-amber-50 p-4 shadow-sm">
-        <div className="mb-2 flex justify-between text-xs font-semibold text-amber-700/70">
+      <div className="card-paper rounded-2xl border border-amber-200 p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-700">
           <span>Warmth</span>
-          <span>{warmthPct}%</span>
+          <span
+            className={`rounded-full px-2 py-0.5 ${
+              warmthPct >= 70
+                ? "bg-emerald-100 text-emerald-700"
+                : warmthPct >= 45
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-red-100 text-red-700"
+            }`}
+          >
+            {warmthPct}%
+          </span>
         </div>
-        <div className="h-5 w-full overflow-hidden rounded-full bg-zinc-200">
+        <div className="h-5 w-full overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
           <div
-            className={`h-full rounded-full transition-all duration-150 ${warmColor}`}
+            className={`h-full rounded-full bg-gradient-to-r ${warmColor} transition-all duration-150`}
             style={{ width: `${warmthPct}%` }}
           />
         </div>
         <div className="mt-2 grid grid-cols-3 gap-1 text-center text-[10px] font-bold uppercase tracking-wide">
-          <span className="rounded bg-emerald-500/20 px-1 py-0.5 text-emerald-700">
+          <span className="rounded bg-emerald-500/15 px-1 py-0.5 text-emerald-700">
             70+ = $14
           </span>
-          <span className="rounded bg-amber-400/30 px-1 py-0.5 text-amber-700">
+          <span className="rounded bg-amber-400/25 px-1 py-0.5 text-amber-700">
             45+ = $8
           </span>
-          <span className="rounded bg-red-500/20 px-1 py-0.5 text-red-700">
+          <span className="rounded bg-red-500/15 px-1 py-0.5 text-red-700">
             20+ = $3
           </span>
         </div>
@@ -896,7 +1106,7 @@ function DeliveryPanel({
       <button
         onClick={pedal}
         disabled={!canPedal}
-        className="rounded-full bg-amber-700 px-8 py-3 text-lg font-bold text-amber-50 shadow-lg transition hover:bg-amber-800 active:scale-95 disabled:opacity-50"
+        className="btn-primary rounded-full px-8 py-3 text-lg font-bold disabled:cursor-not-allowed disabled:opacity-40"
       >
         {canPedal ? "Pedal! (space)" : "pedaling..."}
       </button>
