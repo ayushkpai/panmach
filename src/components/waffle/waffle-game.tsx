@@ -30,6 +30,14 @@ interface Order {
   recipe: IngredientId[];
   required: ToppingId[];
   dineIn: boolean;
+  request: SpecialRequest | null;
+}
+
+type SpecialRequestId = "crispy" | "no-syrup" | "no-berries" | "double-butter";
+
+interface SpecialRequest {
+  id: SpecialRequestId;
+  label: string;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -39,6 +47,43 @@ function shuffle<T>(arr: T[]): T[] {
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
+}
+
+const REQUESTS: {
+  id: SpecialRequestId;
+  label: string;
+  conflicts: ToppingId[];
+}[] = [
+  { id: "crispy", label: "extra crispy", conflicts: [] },
+  { id: "no-syrup", label: "no syrup", conflicts: ["syrup"] },
+  { id: "no-berries", label: "no berries", conflicts: ["berries"] },
+  { id: "double-butter", label: "double butter", conflicts: [] },
+];
+
+function makeRequest(required: ToppingId[]): SpecialRequest | null {
+  const pool = REQUESTS.filter(
+    (r) => !r.conflicts.some((c) => required.includes(c))
+  );
+  if (pool.length === 0 || Math.random() < 0.5) return null;
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  return { id: pick.id, label: pick.label };
+}
+
+function meetsRequest(
+  r: SpecialRequest,
+  rating: CookRating,
+  toppings: ToppingId[]
+): boolean {
+  switch (r.id) {
+    case "crispy":
+      return rating === "crisp";
+    case "no-syrup":
+      return !toppings.includes("syrup");
+    case "no-berries":
+      return !toppings.includes("berries");
+    case "double-butter":
+      return toppings.filter((t) => t === "butter").length >= 2;
+  }
 }
 
 function makeOrder(): Order {
@@ -56,6 +101,7 @@ function makeOrder(): Order {
     recipe,
     required,
     dineIn: Math.random() < 0.5,
+    request: makeRequest(required),
   };
 }
 
@@ -96,6 +142,14 @@ const DELIVERY_BLOCKS = 6;
 const PEDAL_BASE = 0.55;
 const PEDAL_STEP = 0.05;
 const PEDAL_MAX = 1.2;
+const HAZARD_WINDOW = 0.9;
+const HAZARD_DAMAGE = 12;
+const HAZARD_AT = [4, 8.5];
+const HAZARD_TYPES = ["pothole", "cone", "pedestrian"] as const;
+
+function pickHazard() {
+  return HAZARD_TYPES[Math.floor(Math.random() * HAZARD_TYPES.length)];
+}
 const STREETS = [
   "Batter Ave",
   "Syrup St",
@@ -154,6 +208,8 @@ export default function WaffleGame() {
   const [street, setStreet] = useState(() => randomAddress());
   const [road, setRoad] = useState(0);
   const [patience, setPatience] = useState(PATIENCE_MAX);
+  const [hazard, setHazard] = useState<string | null>(null);
+  const [hazardLeft, setHazardLeft] = useState(0);
   const clickLock = useRef(false);
   const roadRef = useRef(0);
   const patienceRef = useRef(PATIENCE_MAX);
@@ -161,6 +217,10 @@ export default function WaffleGame() {
   const blocksRef = useRef(DELIVERY_BLOCKS);
   const cooldownRef = useRef(0);
   const pedalCountRef = useRef(0);
+  const hazardRef = useRef<string | null>(null);
+  const hazardUntilRef = useRef(0);
+  const hazardsQueueRef = useRef<number[]>([]);
+  const deliveryElapsedRef = useRef(0);
 
   const showToast = (msg: string) => {
     setToast(null);
@@ -309,6 +369,11 @@ export default function WaffleGame() {
     roadRef.current = 0;
     setRoad(0);
     pedalCountRef.current = 0;
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
+    hazardsQueueRef.current = [...HAZARD_AT];
+    deliveryElapsedRef.current = 0;
     setStreet(randomAddress());
   };
 
@@ -320,11 +385,19 @@ export default function WaffleGame() {
       return;
     }
     const optional = toppings.filter((t) => !order.required.includes(t)).length;
-    const pay = 6 + 3 * order.required.length + 2 * optional;
+    const requestMet = order.request
+      ? meetsRequest(order.request, rating, toppings)
+      : false;
+    const pay = 6 + 3 * order.required.length + 2 * optional + (requestMet ? 6 : 0);
     setScore((s) => s + pay);
     clickLock.current = true;
+    const requestNote = order.request
+      ? requestMet
+        ? ` Nailed the "${order.request.label}" request! +$6!`
+        : ` (missed the "${order.request.label}"...)`
+      : "";
     if (order.dineIn) {
-      showToast(`Rung up! +$${pay} — take the plate to the table!`);
+      showToast(`Rung up! +$${pay} — take the plate to the table!${requestNote}`);
       setTimeout(() => {
         clickLock.current = false;
         patienceRef.current = PATIENCE_MAX;
@@ -333,7 +406,7 @@ export default function WaffleGame() {
       }, 1100);
       return;
     }
-    showToast(`Rung up! +$${pay} — now deliver it hot.`);
+    showToast(`Rung up! +$${pay} — now deliver it hot.${requestNote}`);
     clickLock.current = true;
     setTimeout(() => {
       clickLock.current = false;
@@ -348,6 +421,11 @@ cooldownRef.current = 0;
     patienceRef.current = PATIENCE_MAX;
     setPatience(PATIENCE_MAX);
     pedalCountRef.current = 0;
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
+    hazardsQueueRef.current = [...HAZARD_AT];
+    deliveryElapsedRef.current = 0;
       setStreet(randomAddress());
       setPhase("delivery");
     }, 1100);
@@ -370,6 +448,7 @@ cooldownRef.current = 0;
     if (phase !== "delivery" || clickLock.current) return;
     if (blocksRef.current <= 0 || warmthRef.current <= 0) return;
     if (cooldownRef.current > 0) return;
+    if (hazardRef.current) return;
     const left = blocksRef.current - 1;
     blocksRef.current = left;
     setBlocksLeft(left);
@@ -388,6 +467,9 @@ cooldownRef.current = 0;
   const arrive = (w: number) => {
     const { tip, note } = tipFor(w);
     clickLock.current = true;
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
     setScore((s) => s + tip);
     setServed((s) => s + 1);
     showToast(`${note} +$${tip} tip`);
@@ -400,6 +482,9 @@ cooldownRef.current = 0;
   const failDelivery = () => {
     if (clickLock.current) return;
     clickLock.current = true;
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
     warmthRef.current = 0;
     setWarmth(0);
     const left = hearts - 1;
@@ -413,6 +498,27 @@ cooldownRef.current = 0;
       }
       startNextOrder();
     }, 1100);
+  };
+
+  const hitHazard = () => {
+    const name = hazardRef.current ?? "obstacle";
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
+    warmthRef.current = Math.max(warmthRef.current - HAZARD_DAMAGE, 0);
+    setWarmth(warmthRef.current);
+    showToast(`Ouch — hit a ${name}! -${HAZARD_DAMAGE}% warmth`);
+    if (warmthRef.current <= 0) failDelivery();
+  };
+
+  const dodgeHazard = () => {
+    if (!hazardRef.current) return;
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
+    warmthRef.current = Math.min(warmthRef.current + 4, WARM_MAX);
+    setWarmth(warmthRef.current);
+    showToast("Smooth dodge! +4% warmth");
   };
 
   useEffect(() => {
@@ -429,6 +535,30 @@ cooldownRef.current = 0;
       setWarmth(warmthRef.current);
       cooldownRef.current = Math.max(cooldownRef.current - dt, 0);
       setCooldown(cooldownRef.current);
+
+      deliveryElapsedRef.current += dt;
+      const nextAt = hazardsQueueRef.current[0];
+      if (
+        !hazardRef.current &&
+        nextAt !== undefined &&
+        deliveryElapsedRef.current >= nextAt
+      ) {
+        hazardsQueueRef.current.shift();
+        hazardRef.current = pickHazard();
+        setHazard(hazardRef.current);
+        hazardUntilRef.current = deliveryElapsedRef.current + HAZARD_WINDOW;
+        showToast(`A ${hazardRef.current} is up ahead — dodge!`);
+      }
+      if (hazardRef.current && !clickLock.current) {
+        const left = hazardUntilRef.current - deliveryElapsedRef.current;
+        setHazardLeft(Math.max(0, left));
+        if (left <= 0) {
+          hitHazard();
+        }
+      } else {
+        setHazardLeft(0);
+      }
+
       if (warmthRef.current <= 0) {
         failDelivery();
         return;
@@ -465,12 +595,15 @@ cooldownRef.current = 0;
       if (phase === "cook") toggleIron();
       else if (phase === "serve") serve();
       else if (phase === "table") serveTable();
-      else if (phase === "delivery") pedal();
+      else if (phase === "delivery") {
+        if (hazardRef.current) dodgeHazard();
+        else pedal();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [screen, phase, cooking, cook, toppings, order, hearts, cooldown]);
+  }, [screen, phase, cooking, cook, toppings, order, hearts, cooldown, hazard]);
 
   const startOver = () => {
     setScreen("play");
@@ -498,6 +631,11 @@ cooldownRef.current = 0;
     patienceRef.current = PATIENCE_MAX;
     setPatience(PATIENCE_MAX);
     pedalCountRef.current = 0;
+    hazardRef.current = null;
+    setHazard(null);
+    setHazardLeft(0);
+    hazardsQueueRef.current = [...HAZARD_AT];
+    deliveryElapsedRef.current = 0;
     setStreet(randomAddress());
   };
 
@@ -649,7 +787,12 @@ cooldownRef.current = 0;
             <span>
               {order.dineIn
                 ? "Serve it at the counter — this customer is eating in!"
-                : `Add what they ordered, then deliver it to ${street}.`}
+                : `Add what they ordered, then deliver it to ${street}.`}{" "}
+              {order.request && (
+                <span className="text-amber-950">
+                  Request: {order.request.label} (+$6).
+                </span>
+              )}
             </span>
           )}
           {phase === "table" && (
@@ -829,6 +972,9 @@ cooldownRef.current = 0;
                 blocksLeft={blocksLeft}
                 cooldown={cooldown}
                 pedal={pedal}
+                hazard={hazard}
+                hazardLeft={hazardLeft}
+                dodge={dodgeHazard}
               />
             )}
           </section>
@@ -997,6 +1143,12 @@ function ServePanel({
             {order.dineIn ? "dine-in · eat here" : "delivery · to go"}
           </span>
         </div>
+        {order.request && (
+          <div className="mt-2 flex items-center justify-between rounded-md border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-[11px] font-bold text-amber-800">
+            <span>★ request: {order.request.label}</span>
+            <span className="text-emerald-700">+$6</span>
+          </div>
+        )}
         <ul className="mt-3 space-y-1.5 text-sm text-amber-900">
           {order.required.map((t) => {
             const has = count(t) > 0;
@@ -1234,11 +1386,15 @@ function RoadScene({
   drive,
   street,
   arrived,
+  hazard,
+  hazardLeft,
 }: {
   road: number;
   drive: boolean;
   street: string;
   arrived: boolean;
+  hazard: string | null;
+  hazardLeft: number;
 }) {
   const scroll = road * 110; // px of street scrolled
   const wrap = ROAD_TILE * ROAD_TILES;
@@ -1323,6 +1479,28 @@ function RoadScene({
         </div>
       </div>
 
+      {/* hazard obstacle + warning */}
+      {hazard && !arrived && (
+        <>
+          <div className="pointer-events-none absolute inset-0 z-20 animate-pulse rounded-2xl ring-4 ring-inset ring-red-500/70" />
+          <div
+            className="absolute left-[52%] z-20"
+            style={{
+              bottom: hazard === "pedestrian" ? "27%" : "30%",
+              transform: "translateX(-50%)",
+            }}
+          >
+            <RoadHazard type={hazard} />
+          </div>
+          <div
+            className="absolute left-1/2 top-1 z-20 -translate-x-1/2 rounded-full bg-red-600 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-white shadow-md"
+            style={{ opacity: Math.max(0.35, Math.min(1, hazardLeft / 0.45)) }}
+          >
+            dodge now!
+          </div>
+        </>
+      )}
+
       {/* scooter */}
       <div
         className="absolute bottom-[6%] left-1/2 z-10"
@@ -1352,6 +1530,37 @@ function RoadScene({
         </div>
       )}
     </div>
+  );
+}
+
+function RoadHazard({ type }: { type: string }) {
+  if (type === "pothole") {
+    return (
+      <svg viewBox="0 0 46 20" className="h-5 w-[92px] drop-shadow-md" aria-hidden="true">
+        <ellipse cx={23} cy={10} rx={21} ry={8} fill="#27272a" />
+        <ellipse cx={23} cy={10} rx={16} ry={5.5} fill="#09090b" />
+        <ellipse cx={16} cy={9} rx={4} ry={1.5} fill="#52525b" />
+        <ellipse cx={30} cy={12} rx={3} ry={1.2} fill="#52525b" />
+      </svg>
+    );
+  }
+  if (type === "cone") {
+    return (
+      <svg viewBox="0 0 28 34" className="h-[52px] w-[42px] drop-shadow-md" aria-hidden="true">
+        <path d="M14 4 L21 30 H7 Z" fill="#f97316" />
+        <path d="M14 4 L21 30 H14 Z" fill="#fdba74" />
+        <rect x={3} y={29} width={22} height={4} rx={1} fill="#ea580c" />
+        <rect x={9} y={10} width={10} height={3} rx={1.2} fill="#ffffff" opacity={0.9} />
+        <rect x={8} y={19} width={12} height={3} rx={1.2} fill="#ffffff" opacity={0.9} />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 26 46" className="h-[66px] w-[38px] drop-shadow-md" aria-hidden="true">
+      <circle cx={13} cy={7} r={5} fill="#334155" />
+      <path d="M13 12 Q6 20 7 30 L4 44 H9 L11 32 H15 L17 44 H22 L19 30 Q20 20 13 12 Z" fill="#64748b" />
+      <rect x={9} y={22} width={8} height={4} rx={1} fill="#facc15" opacity={0.9} />
+    </svg>
   );
 }
 
@@ -1492,6 +1701,9 @@ function DeliveryPanel({
   blocksLeft,
   cooldown,
   pedal,
+  hazard,
+  hazardLeft,
+  dodge,
 }: {
   road: number;
   street: string;
@@ -1499,6 +1711,9 @@ function DeliveryPanel({
   blocksLeft: number;
   cooldown: number;
   pedal: () => void;
+  hazard: string | null;
+  hazardLeft: number;
+  dodge: () => void;
 }) {
   const warmthPct = Math.round(warmth);
   const canPedal = cooldown <= 0;
@@ -1558,15 +1773,32 @@ function DeliveryPanel({
           </span>
         </div>
       </div>
-      <RoadScene road={road} drive={drive} street={street} arrived={arrived} />
-      <button
-        onClick={pedal}
-        disabled={!canPedal}
-        className="btn-primary rounded-full px-8 py-3 text-lg font-bold disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {canPedal ? "Pedal! (space)" : "pedaling..."}
-      </button>
-      {!canPedal && (
+      <RoadScene
+        road={road}
+        drive={drive}
+        street={street}
+        arrived={arrived}
+        hazard={hazard}
+        hazardLeft={hazardLeft}
+      />
+      {hazard ? (
+        <button
+          onClick={dodge}
+          disabled={hazardLeft <= 0}
+          className="btn-go rounded-full px-8 py-3 text-lg font-bold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Dodge the {hazard}! (space)
+        </button>
+      ) : (
+        <button
+          onClick={pedal}
+          disabled={!canPedal}
+          className="btn-primary rounded-full px-8 py-3 text-lg font-bold disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {canPedal ? "Pedal! (space)" : "pedaling..."}
+        </button>
+      )}
+      {!canPedal && !hazard && (
         <p className="-mt-2 text-center text-xs text-amber-800/60">
           catching your breath...
         </p>
