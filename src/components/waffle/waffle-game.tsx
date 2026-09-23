@@ -29,6 +29,7 @@ interface Order {
   name: string;
   recipe: IngredientId[];
   required: ToppingId[];
+  dineIn: boolean;
 }
 
 function shuffle<T>(arr: T[]): T[] {
@@ -54,10 +55,11 @@ function makeOrder(): Order {
     name: `Waffle with ${names.join(" & ")}`,
     recipe,
     required,
+    dineIn: Math.random() < 0.5,
   };
 }
 
-type Phase = "mix" | "cook" | "serve" | "delivery";
+type Phase = "mix" | "cook" | "serve" | "table" | "delivery";
 type Screen = "start" | "play" | "over";
 type CookRating = "golden" | "crisp" | null;
 
@@ -116,6 +118,16 @@ function tipFor(warmth: number): { tip: number; note: string } {
   return { tip: 1, note: "Cold waffle, tiny tip." };
 }
 
+const PATIENCE_MAX = 100;
+const PATIENCE_DRAIN = PATIENCE_MAX / 15;
+
+function tipForFreshness(patience: number): { tip: number; note: string } {
+  if (patience >= 70) return { tip: 8, note: "Right from the iron! Great tip." };
+  if (patience >= 45) return { tip: 5, note: "Still nice and hot. Good tip." };
+  if (patience >= 20) return { tip: 3, note: "A little slow off the iron..." };
+  return { tip: 2, note: "They waited a while. Small tip." };
+}
+
 export default function WaffleGame() {
   const [screen, setScreen] = useState<Screen>("start");
   const [phase, setPhase] = useState<Phase>("mix");
@@ -141,8 +153,10 @@ export default function WaffleGame() {
   const [cooldown, setCooldown] = useState(0);
   const [street, setStreet] = useState(() => randomAddress());
   const [road, setRoad] = useState(0);
+  const [patience, setPatience] = useState(PATIENCE_MAX);
   const clickLock = useRef(false);
   const roadRef = useRef(0);
+  const patienceRef = useRef(PATIENCE_MAX);
   const warmthRef = useRef(WARM_MAX);
   const blocksRef = useRef(DELIVERY_BLOCKS);
   const cooldownRef = useRef(0);
@@ -308,6 +322,17 @@ export default function WaffleGame() {
     const optional = toppings.filter((t) => !order.required.includes(t)).length;
     const pay = 6 + 3 * order.required.length + 2 * optional;
     setScore((s) => s + pay);
+    clickLock.current = true;
+    if (order.dineIn) {
+      showToast(`Rung up! +$${pay} — take the plate to the table!`);
+      setTimeout(() => {
+        clickLock.current = false;
+        patienceRef.current = PATIENCE_MAX;
+        setPatience(PATIENCE_MAX);
+        setPhase("table");
+      }, 1100);
+      return;
+    }
     showToast(`Rung up! +$${pay} — now deliver it hot.`);
     clickLock.current = true;
     setTimeout(() => {
@@ -316,14 +341,29 @@ export default function WaffleGame() {
       setWarmth(WARM_MAX);
       blocksRef.current = DELIVERY_BLOCKS;
       setBlocksLeft(DELIVERY_BLOCKS);
-      cooldownRef.current = 0;
-      setCooldown(0);
-      roadRef.current = 0;
-      setRoad(0);
-      pedalCountRef.current = 0;
+cooldownRef.current = 0;
+    setCooldown(0);
+    roadRef.current = 0;
+    setRoad(0);
+    patienceRef.current = PATIENCE_MAX;
+    setPatience(PATIENCE_MAX);
+    pedalCountRef.current = 0;
       setStreet(randomAddress());
       setPhase("delivery");
     }, 1100);
+  };
+
+  const serveTable = () => {
+    if (phase !== "table" || clickLock.current) return;
+    const { tip, note } = tipForFreshness(patienceRef.current);
+    clickLock.current = true;
+    setScore((s) => s + tip);
+    setServed((s) => s + 1);
+    showToast(`${note} +$${tip} tip`);
+    setTimeout(() => {
+      clickLock.current = false;
+      startNextOrder();
+    }, 1200);
   };
 
   const pedal = () => {
@@ -401,11 +441,30 @@ export default function WaffleGame() {
   }, [phase]);
 
   useEffect(() => {
+    if (phase !== "table") return;
+    let raf = 0;
+    let last = performance.now();
+    const tick = (now: number) => {
+      const dt = (now - last) / 1000;
+      last = now;
+      patienceRef.current = Math.max(
+        patienceRef.current - dt * PATIENCE_DRAIN,
+        0
+      );
+      setPatience(patienceRef.current);
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [phase]);
+
+  useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== "Space" || screen !== "play") return;
       e.preventDefault();
       if (phase === "cook") toggleIron();
       else if (phase === "serve") serve();
+      else if (phase === "table") serveTable();
       else if (phase === "delivery") pedal();
     };
     window.addEventListener("keydown", onKey);
@@ -436,6 +495,8 @@ export default function WaffleGame() {
     setCooldown(0);
     roadRef.current = 0;
     setRoad(0);
+    patienceRef.current = PATIENCE_MAX;
+    setPatience(PATIENCE_MAX);
     pedalCountRef.current = 0;
     setStreet(randomAddress());
   };
@@ -518,9 +579,20 @@ export default function WaffleGame() {
               <div className="text-base font-black tracking-tight text-amber-950 sm:text-lg">
                 Waffle Prime
               </div>
-              <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700/70 sm:text-[11px]">
-                order{" "}
-                <span className="text-amber-900">#{served + 1}</span>
+              <div className="flex items-center gap-1.5">
+                <div className="text-[10px] font-bold uppercase tracking-widest text-amber-700/70 sm:text-[11px]">
+                  order{" "}
+                  <span className="text-amber-900">#{served + 1}</span>
+                </div>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[8px] font-black uppercase tracking-wider ${
+                    order.dineIn
+                      ? "bg-sky-100 text-sky-700"
+                      : "bg-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  {order.dineIn ? "dine-in" : "delivery"}
+                </span>
               </div>
             </div>
           </div>
@@ -556,9 +628,11 @@ export default function WaffleGame() {
             className={`h-2.5 w-2.5 shrink-0 rounded-full ${
               phase === "delivery"
                 ? "bg-emerald-500"
-                : phase === "cook"
-                  ? "bg-orange-500"
-                  : "bg-amber-500"
+                : phase === "table"
+                  ? "bg-sky-500"
+                  : phase === "cook"
+                    ? "bg-orange-500"
+                    : "bg-amber-500"
             }`}
           />
           {phase === "mix" && (
@@ -572,7 +646,14 @@ export default function WaffleGame() {
             </span>
           )}
           {phase === "serve" && (
-            <span>Add what the customer ordered, garnish how you like, then serve.</span>
+            <span>
+              {order.dineIn
+                ? "Serve it at the counter — this customer is eating in!"
+                : `Add what they ordered, then deliver it to ${street}.`}
+            </span>
+          )}
+          {phase === "table" && (
+            <span>Carry the plate to the table before it gets cold!</span>
           )}
           {phase === "delivery" && (
             <span>Pedal to {street} fast — the warm meter is draining!</span>
@@ -633,6 +714,7 @@ export default function WaffleGame() {
                   : rating === "crisp"
                     ? "crispy grade"
                     : "build your waffle")}
+              {phase === "table" && "serve the table"}
               {phase === "delivery" && "hot delivery zone"}
             </div>
           </section>
@@ -727,6 +809,15 @@ export default function WaffleGame() {
                 toppings={toppings}
                 addTopping={addTopping}
                 serve={serve}
+              />
+            )}
+
+            {phase === "table" && (
+              <TablePanel
+                patience={patience}
+                doneness={doneness}
+                toppings={toppings}
+                serveTable={serveTable}
               />
             )}
 
@@ -895,6 +986,17 @@ function ServePanel({
         <div className="mt-2 text-lg font-black leading-tight text-amber-950">
           {order.name}
         </div>
+        <div className="mt-1">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+              order.dineIn
+                ? "bg-sky-100 text-sky-700"
+                : "bg-emerald-100 text-emerald-700"
+            }`}
+          >
+            {order.dineIn ? "dine-in · eat here" : "delivery · to go"}
+          </span>
+        </div>
         <ul className="mt-3 space-y-1.5 text-sm text-amber-900">
           {order.required.map((t) => {
             const has = count(t) > 0;
@@ -946,12 +1048,170 @@ function ServePanel({
           })}
         </div>
       </div>
+<button
+          onClick={serve}
+          className="btn-go rounded-full px-8 py-3 text-lg font-bold disabled:opacity-40"
+        >
+          {order.dineIn ? "Serve at the Counter" : "Serve & Ring Up"}
+        </button>
+    </div>
+  );
+}
+
+function TablePanel({
+  patience,
+  doneness,
+  toppings,
+  serveTable,
+}: {
+  patience: number;
+  doneness: number;
+  toppings: ToppingId[];
+  serveTable: () => void;
+}) {
+  const [served, setServed] = useState(false);
+  const patiencePct = Math.round(patience);
+  const freshColor =
+    patiencePct >= 70
+      ? "from-sky-500 to-sky-400"
+      : patiencePct >= 45
+        ? "from-amber-500 to-amber-400"
+        : "from-red-500 to-red-400";
+  return (
+    <div className="flex flex-1 flex-col justify-center gap-4">
+      <TableScene
+        patience={patiencePct}
+        doneness={doneness}
+        toppings={toppings}
+        served={served}
+      />
+      <div className="card-paper rounded-2xl border border-amber-200 p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between text-xs font-bold uppercase tracking-wider text-amber-700">
+          <span>Freshness</span>
+          <span
+            className={`rounded-full px-2 py-0.5 ${
+              patiencePct >= 70
+                ? "bg-sky-100 text-sky-700"
+                : patiencePct >= 45
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-red-100 text-red-700"
+            }`}
+          >
+            {patiencePct}%
+          </span>
+        </div>
+        <div className="h-5 w-full overflow-hidden rounded-full border border-zinc-200 bg-zinc-100">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r ${freshColor} transition-all duration-150`}
+            style={{ width: `${patiencePct}%` }}
+          />
+        </div>
+        <div className="mt-2 grid grid-cols-4 gap-1 text-center text-[10px] font-bold uppercase tracking-wide">
+          <span className="rounded bg-sky-500/15 px-1 py-0.5 text-sky-700">
+            70+ = $8
+          </span>
+          <span className="rounded bg-amber-400/25 px-1 py-0.5 text-amber-700">
+            45+ = $5
+          </span>
+          <span className="rounded bg-orange-500/15 px-1 py-0.5 text-orange-700">
+            20+ = $3
+          </span>
+          <span className="rounded bg-red-500/15 px-1 py-0.5 text-red-700">
+            0 = $2
+          </span>
+        </div>
+      </div>
       <button
-        onClick={serve}
+        onClick={() => {
+          setServed(true);
+          serveTable();
+        }}
+        disabled={served}
         className="btn-go rounded-full px-8 py-3 text-lg font-bold disabled:opacity-40"
       >
-        Serve & Ring Up
+        {served ? "Plate is down!" : "Serve the Table! (space)"}
       </button>
+      {!served && patiencePct < 30 && (
+        <p className="-mt-2 text-center text-xs text-red-700/80">
+          they&apos;re getting impatient...
+        </p>
+      )}
+    </div>
+  );
+}
+
+function TableScene({
+  patience,
+  doneness,
+  toppings,
+  served,
+}: {
+  patience: number;
+  doneness: number;
+  toppings: ToppingId[];
+  served: boolean;
+}) {
+  const impatient = patience < 30 && !served;
+  return (
+    <div className="relative h-44 overflow-hidden rounded-2xl border border-amber-200/70 shadow-inner">
+      {/* wall */}
+      <div className="absolute inset-x-0 top-0 bottom-[40%] bg-gradient-to-b from-[#f7e6c4] to-[#eed7a8]" />
+      {/* window */}
+      <div className="absolute right-3 top-3 h-14 w-20 overflow-hidden rounded-lg border-4 border-[#b48a4a] bg-[#bfe0e8]">
+        <div className="absolute left-1.5 top-1.5 h-3.5 w-3.5 rounded-full bg-yellow-300" />
+        <div className="absolute bottom-1.5 left-3 h-2 w-9 rounded-full bg-white/80" />
+        <div className="absolute left-1/2 top-0 h-full w-0.5 -translate-x-1/2 bg-[#b48a4a]" />
+        <div className="absolute left-0 top-1/2 h-0.5 w-full -translate-y-1/2 bg-[#b48a4a]" />
+      </div>
+      {/* wall sign */}
+      <div className="absolute left-3 top-3 rounded-md bg-amber-800 px-2 py-1 text-[8px] font-black uppercase tracking-wider text-amber-100 shadow">
+        Waffle Prime
+      </div>
+      {/* floor */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-[40%]"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(90deg, #c98d4f 0 28px, #b97e44 28px 56px)",
+        }}
+      />
+      <div className="absolute inset-x-0 bottom-[40%] h-1.5 bg-[#a86f3b]" />
+      {/* table */}
+      <div className="absolute bottom-[18%] left-1/2 flex -translate-x-1/2 flex-col items-center">
+        <div className="h-3 w-44 rounded-full bg-[#8a5a33] shadow-md" />
+        <div className="h-10 w-2 bg-[#6f4628]" />
+        <div className="-mt-0.5 h-2 w-16 rounded bg-[#6f4628]" />
+      </div>
+      {/* plate + waffle */}
+      <div className="absolute bottom-[24%] left-1/2 z-10 flex -translate-x-1/2 flex-col items-center">
+        <div className="h-16 w-16 drop-shadow-lg">
+          <TopWaffle doneness={doneness} toppings={toppings} />
+        </div>
+        <div className="-mt-1.5 h-3.5 w-32 rounded-full border border-zinc-100 bg-white shadow" />
+      </div>
+      {/* customer */}
+      <div className="absolute bottom-[22%] right-[5%] flex flex-col items-center">
+        <div className="relative">
+          <div className="h-7 w-7 rounded-full bg-[#f0c396]" />
+          <div className="absolute left-0 top-0 h-3 w-7 rounded-t-full bg-[#5b4636]" />
+          <div className="mx-auto -mt-1 h-9 w-10 rounded-t-3xl bg-[#4aa3df]" />
+        </div>
+        <div className="-mt-1 h-2 w-12 rounded bg-[#8a5a33]" />
+        <div className="h-6 w-1.5 bg-[#6f4628]" />
+      </div>
+      {impatient && (
+        <div className="anim-pop absolute right-[10%] top-[28%] grid h-6 w-6 place-items-center rounded-full bg-rose-100 text-sm font-black text-rose-600 shadow">
+          !
+        </div>
+      )}
+      {served && (
+        <>
+          <div className="anim-pop absolute right-[6%] top-[26%] rounded-xl bg-pink-100 px-2 py-1 text-[10px] font-black text-rose-600 shadow">
+            Yum!
+          </div>
+          <div className="anim-floaty absolute right-[4%] top-[12%] h-3 w-3 rotate-45 rounded-[2px] bg-rose-500" />
+        </>
+      )}
     </div>
   );
 }
