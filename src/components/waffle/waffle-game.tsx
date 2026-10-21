@@ -33,7 +33,15 @@ interface Order {
   request: SpecialRequest | null;
 }
 
-type SpecialRequestId = "crispy" | "no-syrup" | "no-berries" | "double-butter";
+type SpecialRequestId =
+  | "syrup-flood"
+  | "choco-bomb"
+  | "berry-overload"
+  | "cream-cloud"
+  | "rainbow"
+  | "everything"
+  | "sweet-stack"
+  | "double-butter";
 
 interface SpecialRequest {
   id: SpecialRequestId;
@@ -54,9 +62,13 @@ const REQUESTS: {
   label: string;
   conflicts: ToppingId[];
 }[] = [
-  { id: "crispy", label: "extra crispy", conflicts: [] },
-  { id: "no-syrup", label: "no syrup", conflicts: ["syrup"] },
-  { id: "no-berries", label: "no berries", conflicts: ["berries"] },
+  { id: "syrup-flood", label: "syrup flood (3x)", conflicts: [] },
+  { id: "choco-bomb", label: "choco bomb (2x)", conflicts: [] },
+  { id: "berry-overload", label: "berry overload (3x)", conflicts: [] },
+  { id: "cream-cloud", label: "cream cloud (2x)", conflicts: [] },
+  { id: "rainbow", label: "rainbow (4 kinds)", conflicts: [] },
+  { id: "everything", label: "the works (all 5)", conflicts: [] },
+  { id: "sweet-stack", label: "sweet stack (syrup+cream)", conflicts: [] },
   { id: "double-butter", label: "double butter", conflicts: [] },
 ];
 
@@ -71,18 +83,28 @@ function makeRequest(required: ToppingId[]): SpecialRequest | null {
 
 function meetsRequest(
   r: SpecialRequest,
-  rating: CookRating,
+  _rating: CookRating,
   toppings: ToppingId[]
 ): boolean {
+  const count = (id: ToppingId) => toppings.filter((t) => t === id).length;
+  const kinds = new Set(toppings).size;
   switch (r.id) {
-    case "crispy":
-      return rating === "crisp";
-    case "no-syrup":
-      return !toppings.includes("syrup");
-    case "no-berries":
-      return !toppings.includes("berries");
+    case "syrup-flood":
+      return count("syrup") >= 3;
+    case "choco-bomb":
+      return count("chocolate") >= 2;
+    case "berry-overload":
+      return count("berries") >= 3;
+    case "cream-cloud":
+      return count("whipped") >= 2;
+    case "rainbow":
+      return kinds >= 4;
+    case "everything":
+      return kinds >= 5;
+    case "sweet-stack":
+      return count("syrup") >= 1 && count("whipped") >= 1;
     case "double-butter":
-      return toppings.filter((t) => t === "butter").length >= 2;
+      return count("butter") >= 2;
   }
 }
 
@@ -774,7 +796,15 @@ cooldownRef.current = 0;
             }`}
           />
           {phase === "mix" && (
-            <span>Mix the batter: add the 3 ingredients on the recipe card, in order.</span>
+            <span>
+              Mix the batter: add the 3 ingredients on the recipe card, in order.
+              {order.request && (
+                <span className="text-amber-950">
+                  {" "}
+                  Bonus request: {order.request.label} (+$6).
+                </span>
+              )}
+            </span>
           )}
           {phase === "cook" && (
             <span>
@@ -787,9 +817,10 @@ cooldownRef.current = 0;
             <span>
               {order.dineIn
                 ? "Serve it at the counter — this customer is eating in!"
-                : `Add what they ordered, then deliver it to ${street}.`}{" "}
+                : `Add what they ordered, then deliver it to ${street}.`}
               {order.request && (
                 <span className="text-amber-950">
+                  {" "}
                   Request: {order.request.label} (+$6).
                 </span>
               )}
